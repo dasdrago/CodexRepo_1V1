@@ -3,18 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HDMA Memory UVM Regression Guide</title>
+  <title>HDMA UVM Guide and AXI Primer</title>
   <style>
     :root {
       --bg: #f7f1e5;
-      --bg-soft: rgba(255, 248, 236, 0.78);
       --ink: #1d252b;
       --muted: #4f5b66;
       --accent: #bb4d1f;
       --accent-deep: #7f2c12;
       --accent-soft: #ffd7b5;
+      --accent-cool: #d9efe5;
       --panel: rgba(255, 252, 246, 0.82);
-      --panel-strong: #fff9f0;
       --line: rgba(29, 37, 43, 0.12);
       --shadow: 0 24px 60px rgba(80, 49, 17, 0.12);
       --radius: 24px;
@@ -58,6 +57,10 @@
       color: inherit;
     }
 
+    [hidden] {
+      display: none !important;
+    }
+
     .shell {
       width: min(1160px, calc(100% - 2rem));
       margin: 0 auto;
@@ -68,12 +71,17 @@
     .topbar {
       position: sticky;
       top: 0.75rem;
-      z-index: 10;
-      display: flex;
-      justify-content: center;
-      margin-bottom: 1.2rem;
+      z-index: 20;
+      margin-bottom: 1.25rem;
     }
 
+    .topbar-stack {
+      display: grid;
+      gap: 0.7rem;
+      justify-items: center;
+    }
+
+    .tab-strip,
     .nav {
       display: flex;
       gap: 0.5rem;
@@ -87,15 +95,22 @@
       box-shadow: var(--shadow);
     }
 
+    .tab-button,
     .nav a {
+      border: 0;
       text-decoration: none;
       font-size: 0.95rem;
       padding: 0.55rem 0.95rem;
       border-radius: 999px;
       color: var(--muted);
+      background: transparent;
+      cursor: pointer;
       transition: transform 180ms ease, background-color 180ms ease, color 180ms ease;
+      font-family: var(--sans);
     }
 
+    .tab-button:hover,
+    .tab-button:focus-visible,
     .nav a:hover,
     .nav a:focus-visible {
       transform: translateY(-1px);
@@ -104,12 +119,22 @@
       outline: none;
     }
 
+    .tab-button.is-active {
+      background: linear-gradient(135deg, #a83f16, #da8b45);
+      color: #fffdf9;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+    }
+
+    .page {
+      display: grid;
+      gap: 1.2rem;
+    }
+
     .hero {
       display: grid;
       grid-template-columns: 1.4fr 0.9fr;
       gap: 1.25rem;
       align-items: stretch;
-      margin-bottom: 1.3rem;
     }
 
     .hero-panel,
@@ -143,6 +168,10 @@
       z-index: -1;
     }
 
+    .hero-panel.cool::after {
+      background: linear-gradient(135deg, rgba(64, 129, 105, 0.2), rgba(217, 239, 229, 0.12));
+    }
+
     .eyebrow {
       display: inline-flex;
       align-items: center;
@@ -156,6 +185,11 @@
       text-transform: uppercase;
     }
 
+    .eyebrow.cool {
+      background: rgba(217, 239, 229, 0.8);
+      color: #225842;
+    }
+
     h1,
     h2,
     h3 {
@@ -167,7 +201,7 @@
     h1 {
       font-size: clamp(2.8rem, 5vw, 4.5rem);
       margin-top: 1rem;
-      max-width: 10ch;
+      max-width: 11ch;
     }
 
     h2 {
@@ -189,7 +223,7 @@
 
     .hero-copy {
       margin-top: 1rem;
-      max-width: 62ch;
+      max-width: 64ch;
     }
 
     .hero-grid {
@@ -228,9 +262,12 @@
       border: 1px solid rgba(29, 37, 43, 0.08);
     }
 
+    .stat.cool {
+      background: linear-gradient(180deg, rgba(243, 251, 247, 0.95), rgba(221, 240, 231, 0.72));
+    }
+
     .section {
       padding: 1.6rem;
-      margin-top: 1.2rem;
     }
 
     .section-header {
@@ -248,6 +285,10 @@
       font-size: 0.85rem;
     }
 
+    .label.cool {
+      color: #225842;
+    }
+
     .grid {
       display: grid;
       gap: 1rem;
@@ -261,11 +302,32 @@
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
+    .grid.five {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
     .card {
       background: rgba(255, 255, 255, 0.72);
       border: 1px solid var(--line);
       border-radius: 20px;
       padding: 1.15rem;
+    }
+
+    .channel-card {
+      padding-top: 1.3rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .channel-card::before {
+      content: attr(data-short);
+      position: absolute;
+      top: 0.85rem;
+      right: 0.95rem;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      letter-spacing: 0.12em;
+      color: rgba(29, 37, 43, 0.38);
     }
 
     .card p + p,
@@ -383,7 +445,6 @@
 
     .callout {
       padding: 1.4rem;
-      margin-top: 1.2rem;
       background: linear-gradient(135deg, rgba(255, 234, 212, 0.92), rgba(244, 252, 246, 0.92));
     }
 
@@ -414,10 +475,33 @@
       color: var(--ink);
     }
 
-    @media (max-width: 920px) {
+    .quote-card {
+      border-left: 6px solid #4d8c73;
+      background: rgba(247, 253, 250, 0.82);
+    }
+
+    .sources {
+      display: grid;
+      gap: 0.8rem;
+    }
+
+    .source-link {
+      text-decoration: none;
+    }
+
+    .source-link:hover .card,
+    .source-link:focus-visible .card {
+      border-color: rgba(34, 88, 66, 0.3);
+      transform: translateY(-1px);
+      transition: transform 180ms ease, border-color 180ms ease;
+      outline: none;
+    }
+
+    @media (max-width: 980px) {
       .hero,
       .grid.two,
-      .grid.three {
+      .grid.three,
+      .grid.five {
         grid-template-columns: 1fr;
       }
 
@@ -439,26 +523,6 @@
       .callout {
         animation: rise 700ms ease both;
       }
-
-      .stats-panel {
-        animation-delay: 80ms;
-      }
-
-      .section:nth-of-type(2) {
-        animation-delay: 120ms;
-      }
-
-      .section:nth-of-type(3) {
-        animation-delay: 180ms;
-      }
-
-      .section:nth-of-type(4) {
-        animation-delay: 240ms;
-      }
-
-      .callout {
-        animation-delay: 280ms;
-      }
     }
 
     @keyframes rise {
@@ -477,81 +541,103 @@
 <body>
   <div class="shell">
     <div class="topbar">
-      <nav class="nav" aria-label="Section navigation">
-        <a href="#overview">Overview</a>
-        <a href="#tests">Tests</a>
-        <a href="#build-flow">Build Flow</a>
-        <a href="#regression">Regression</a>
-        <a href="#checklist">Checklist</a>
-      </nav>
+      <div class="topbar-stack">
+        <div class="tab-strip" role="tablist" aria-label="Page tabs">
+          <button class="tab-button is-active" type="button" role="tab" aria-selected="true" data-tab-target="regression-page" data-tab-anchor="overview">
+            Regression Guide
+          </button>
+          <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab-target="axi-page" data-tab-anchor="axi-overview">
+            AXI Protocol
+          </button>
+        </div>
+
+        <nav class="nav" aria-label="Regression navigation" data-nav="regression-page">
+          <a href="#overview">Overview</a>
+          <a href="#tests">Tests</a>
+          <a href="#build-flow">Build Flow</a>
+          <a href="#regression">Regression</a>
+          <a href="#checklist">Checklist</a>
+        </nav>
+
+        <nav class="nav" aria-label="AXI navigation" data-nav="axi-page" hidden>
+          <a href="#axi-overview">Overview</a>
+          <a href="#axi-channels">Channels</a>
+          <a href="#axi-handshake">Handshake</a>
+          <a href="#axi-bursts">Bursts</a>
+          <a href="#axi-uvm">UVM Mapping</a>
+          <a href="#axi-sources">Sources</a>
+        </nav>
+      </div>
     </div>
 
-    <header class="hero">
-      <section class="hero-panel">
-        <span class="eyebrow">User Guide</span>
-        <h1>Creating an HDMA Memory UVM Regression</h1>
-        <p class="hero-copy">
-          This page describes how to set up a UVM verification environment for an HDMA memory design and
-          how to build a small, traceable regression around three tests:
-          <span class="mono">hdma_mem_initialization</span>,
-          <span class="mono">hdma_mem_randomize</span>, and
-          <span class="mono">hdma_mem_full_burst_trf</span>.
-        </p>
-        <div class="hero-grid">
-          <div class="chip">
-            <strong>Target</strong>
-            Verify HDMA memory behavior through reset, constrained-random traffic, and maximum burst transfers.
-          </div>
-          <div class="chip">
-            <strong>Method</strong>
-            Combine sequence-driven stimulus, scoreboard checks, assertions, and coverage-driven closure.
-          </div>
-          <div class="chip">
-            <strong>Outcome</strong>
-            A repeatable regression that can be run by seed, by test, or as a full sanity suite.
-          </div>
-        </div>
-      </section>
+    <main>
+      <div class="page" id="regression-page">
+        <header class="hero">
+          <section class="hero-panel">
+            <span class="eyebrow">User Guide</span>
+            <h1>Creating an HDMA Memory UVM Regression</h1>
+            <p class="hero-copy">
+              This page describes how to set up a UVM verification environment for an HDMA memory design and
+              how to build a small, traceable regression around three tests:
+              <span class="mono">hdma_mem_initialization</span>,
+              <span class="mono">hdma_mem_randomize</span>, and
+              <span class="mono">hdma_mem_full_burst_trf</span>.
+            </p>
+            <div class="hero-grid">
+              <div class="chip">
+                <strong>Target</strong>
+                Verify HDMA memory behavior through reset, constrained-random traffic, and maximum burst transfers.
+              </div>
+              <div class="chip">
+                <strong>Method</strong>
+                Combine sequence-driven stimulus, scoreboard checks, assertions, and coverage-driven closure.
+              </div>
+              <div class="chip">
+                <strong>Outcome</strong>
+                A repeatable regression that can be run by seed, by test, or as a full sanity suite.
+              </div>
+            </div>
+          </section>
 
-      <aside class="stats-panel">
-        <div class="stat">
-          <strong>3 regression tests</strong>
-          <p>One directed test, one constrained-random test, and one stress test for full bursts.</p>
-        </div>
-        <div class="stat">
-          <strong>4 core components</strong>
-          <p>Agent, sequences, scoreboard, and functional coverage are the minimum implementation set.</p>
-        </div>
-        <div class="stat">
-          <strong>Pass criteria</strong>
-          <p>No protocol errors, no scoreboard mismatches, and required coverage bins reached.</p>
-        </div>
-      </aside>
-    </header>
+          <aside class="stats-panel">
+            <div class="stat">
+              <strong>3 regression tests</strong>
+              <p>One directed test, one constrained-random test, and one stress test for full bursts.</p>
+            </div>
+            <div class="stat">
+              <strong>4 core components</strong>
+              <p>Agent, sequences, scoreboard, and functional coverage are the minimum implementation set.</p>
+            </div>
+            <div class="stat">
+              <strong>Pass criteria</strong>
+              <p>No protocol errors, no scoreboard mismatches, and required coverage bins reached.</p>
+            </div>
+          </aside>
+        </header>
 
-    <section class="section" id="overview">
-      <div class="section-header">
-        <div>
-          <div class="label">Verification Target</div>
-          <h2>What the UVM environment must verify</h2>
-        </div>
-        <p>The design under test is an HDMA memory block. The environment should prove correct initialization, data integrity, burst handling, and predictable behavior under randomized traffic.</p>
-      </div>
-      <div class="grid two">
-        <article class="card">
-          <h3>Recommended environment content</h3>
-          <ul>
-            <li>A transaction class that models HDMA memory requests and responses.</li>
-            <li>A sequencer and driver that generate legal traffic into the DUT interface.</li>
-            <li>A monitor that reconstructs observed transfers for checking and coverage.</li>
-            <li>A scoreboard that compares observed memory behavior against the reference model.</li>
-            <li>Assertions for reset handling, address alignment, burst size legality, and handshakes.</li>
-            <li>A functional coverage model for address ranges, burst lengths, data patterns, and corner cases.</li>
-          </ul>
-        </article>
-        <article class="card">
-          <h3>Minimal deliverables</h3>
-          <pre><code>tb/
+        <section class="section" id="overview">
+          <div class="section-header">
+            <div>
+              <div class="label">Verification Target</div>
+              <h2>What the UVM environment must verify</h2>
+            </div>
+            <p>The design under test is an HDMA memory block. The environment should prove correct initialization, data integrity, burst handling, and predictable behavior under randomized traffic.</p>
+          </div>
+          <div class="grid two">
+            <article class="card">
+              <h3>Recommended environment content</h3>
+              <ul>
+                <li>A transaction class that models HDMA memory requests and responses.</li>
+                <li>A sequencer and driver that generate legal traffic into the DUT interface.</li>
+                <li>A monitor that reconstructs observed transfers for checking and coverage.</li>
+                <li>A scoreboard that compares observed memory behavior against the reference model.</li>
+                <li>Assertions for reset handling, address alignment, burst size legality, and handshakes.</li>
+                <li>A functional coverage model for address ranges, burst lengths, data patterns, and corner cases.</li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3>Minimal deliverables</h3>
+              <pre><code>tb/
   env/hdma_mem_env.sv
   agent/hdma_mem_agent.sv
   seq_lib/hdma_mem_sequences.sv
@@ -562,113 +648,113 @@
   scoreboard/hdma_mem_scoreboard.sv
   coverage/hdma_mem_cov.sv
 regression/hdma_mem_regression.list</code></pre>
-        </article>
-      </div>
-    </section>
+            </article>
+          </div>
+        </section>
 
-    <section class="section" id="tests">
-      <div class="section-header">
-        <div>
-          <div class="label">Regression Content</div>
-          <h2>Define the three required tests</h2>
-        </div>
-        <p>Each test should extend a common base test so configuration, agent setup, scoreboard hookup, and reporting stay consistent across the suite.</p>
-      </div>
-      <div class="grid three">
-        <article class="card test-card">
-          <h3>hdma_mem_initialization</h3>
-          <p>Purpose: verify reset behavior and post-reset default memory state.</p>
-          <ul>
-            <li>Drive reset and bring the interface into a known idle state.</li>
-            <li>Read key address regions after reset and compare against the expected initialization pattern.</li>
-            <li>Check that no stale data, spurious writes, or protocol violations appear during startup.</li>
-          </ul>
-          <div class="badge-row">
-            <span class="badge">Directed</span>
-            <span class="badge">1-3 seeds</span>
-            <span class="badge">Reset focused</span>
+        <section class="section" id="tests">
+          <div class="section-header">
+            <div>
+              <div class="label">Regression Content</div>
+              <h2>Define the three required tests</h2>
+            </div>
+            <p>Each test should extend a common base test so configuration, agent setup, scoreboard hookup, and reporting stay consistent across the suite.</p>
           </div>
-        </article>
-        <article class="card test-card">
-          <h3>hdma_mem_randomize</h3>
-          <p>Purpose: explore legal randomized traffic and catch data-path corner cases early.</p>
-          <ul>
-            <li>Randomize addresses, transfer sizes, write data, and read/write mixes under legal constraints.</li>
-            <li>Use the scoreboard to match all reads against the reference model.</li>
-            <li>Collect coverage for address windows, access types, burst lengths, and boundary conditions.</li>
-          </ul>
-          <div class="badge-row">
-            <span class="badge">Constrained random</span>
-            <span class="badge">10-50 seeds</span>
-            <span class="badge">Coverage driver</span>
+          <div class="grid three">
+            <article class="card test-card">
+              <h3>hdma_mem_initialization</h3>
+              <p>Purpose: verify reset behavior and post-reset default memory state.</p>
+              <ul>
+                <li>Drive reset and bring the interface into a known idle state.</li>
+                <li>Read key address regions after reset and compare against the expected initialization pattern.</li>
+                <li>Check that no stale data, spurious writes, or protocol violations appear during startup.</li>
+              </ul>
+              <div class="badge-row">
+                <span class="badge">Directed</span>
+                <span class="badge">1-3 seeds</span>
+                <span class="badge">Reset focused</span>
+              </div>
+            </article>
+            <article class="card test-card">
+              <h3>hdma_mem_randomize</h3>
+              <p>Purpose: explore legal randomized traffic and catch data-path corner cases early.</p>
+              <ul>
+                <li>Randomize addresses, transfer sizes, write data, and read/write mixes under legal constraints.</li>
+                <li>Use the scoreboard to match all reads against the reference model.</li>
+                <li>Collect coverage for address windows, access types, burst lengths, and boundary conditions.</li>
+              </ul>
+              <div class="badge-row">
+                <span class="badge">Constrained random</span>
+                <span class="badge">10-50 seeds</span>
+                <span class="badge">Coverage driver</span>
+              </div>
+            </article>
+            <article class="card test-card">
+              <h3>hdma_mem_full_burst_trf</h3>
+              <p>Purpose: stress the DUT with maximum-length burst transfers and sustained throughput.</p>
+              <ul>
+                <li>Create back-to-back full burst transactions at legal addresses.</li>
+                <li>Check burst packing, address progression, data integrity, and end-of-burst handling.</li>
+                <li>Measure whether the DUT handles long transfers without drops, stalls, or ordering defects.</li>
+              </ul>
+              <div class="badge-row">
+                <span class="badge">Stress</span>
+                <span class="badge">5-20 seeds</span>
+                <span class="badge">Burst focused</span>
+              </div>
+            </article>
           </div>
-        </article>
-        <article class="card test-card">
-          <h3>hdma_mem_full_burst_trf</h3>
-          <p>Purpose: stress the DUT with maximum-length burst transfers and sustained throughput.</p>
-          <ul>
-            <li>Create back-to-back full burst transactions at legal addresses.</li>
-            <li>Check burst packing, address progression, data integrity, and end-of-burst handling.</li>
-            <li>Measure whether the DUT handles long transfers without drops, stalls, or ordering defects.</li>
-          </ul>
-          <div class="badge-row">
-            <span class="badge">Stress</span>
-            <span class="badge">5-20 seeds</span>
-            <span class="badge">Burst focused</span>
-          </div>
-        </article>
-      </div>
-    </section>
+        </section>
 
-    <section class="section" id="build-flow">
-      <div class="section-header">
-        <div>
-          <div class="label">Implementation Flow</div>
-          <h2>Build the environment in a regression-friendly way</h2>
-        </div>
-        <p>The goal is not only to run one test once. The goal is to create a clean structure where the same environment supports compile-once and run-many regression execution.</p>
-      </div>
-      <div class="step-list">
-        <div class="step">
-          <div>
-            <h3>Create a shared base test</h3>
-            <p>
-              Put all common setup in <span class="mono">hdma_mem_base_test</span>: environment creation, virtual interface configuration,
-              default sequence selection, scoreboard enablement, and common objections.
-            </p>
+        <section class="section" id="build-flow">
+          <div class="section-header">
+            <div>
+              <div class="label">Implementation Flow</div>
+              <h2>Build the environment in a regression-friendly way</h2>
+            </div>
+            <p>The goal is not only to run one test once. The goal is to create a clean structure where the same environment supports compile-once and run-many regression execution.</p>
           </div>
-        </div>
-        <div class="step">
-          <div>
-            <h3>Keep stimulus in sequences, not in tests</h3>
-            <p>
-              Each test should mainly select or configure a sequence. This keeps regression maintenance simple and avoids copying traffic generation logic into multiple test classes.
-            </p>
+          <div class="step-list">
+            <div class="step">
+              <div>
+                <h3>Create a shared base test</h3>
+                <p>
+                  Put all common setup in <span class="mono">hdma_mem_base_test</span>: environment creation, virtual interface configuration,
+                  default sequence selection, scoreboard enablement, and common objections.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div>
+                <h3>Keep stimulus in sequences, not in tests</h3>
+                <p>
+                  Each test should mainly select or configure a sequence. This keeps regression maintenance simple and avoids copying traffic generation logic into multiple test classes.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div>
+                <h3>Make checking automatic</h3>
+                <p>
+                  The scoreboard and assertions should run in every test without manual enable switches. A regression only scales when pass and fail conditions are encoded in the testbench itself.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div>
+                <h3>Separate smoke and coverage goals</h3>
+                <p>
+                  Treat <span class="mono">hdma_mem_initialization</span> as a fast smoke check, then use
+                  <span class="mono">hdma_mem_randomize</span> and <span class="mono">hdma_mem_full_burst_trf</span> for broader confidence and coverage closure.
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="step">
-          <div>
-            <h3>Make checking automatic</h3>
-            <p>
-              The scoreboard and assertions should run in every test without manual enable switches. A regression only scales when pass and fail conditions are encoded in the testbench itself.
-            </p>
-          </div>
-        </div>
-        <div class="step">
-          <div>
-            <h3>Separate smoke and coverage goals</h3>
-            <p>
-              Treat <span class="mono">hdma_mem_initialization</span> as a fast smoke check, then use
-              <span class="mono">hdma_mem_randomize</span> and <span class="mono">hdma_mem_full_burst_trf</span> for broader confidence and coverage closure.
-            </p>
-          </div>
-        </div>
-      </div>
 
-      <div class="grid two" style="margin-top: 1rem;">
-        <article class="card">
-          <h3>Example test registration</h3>
-          <pre><code>class hdma_mem_initialization_test extends hdma_mem_base_test;
+          <div class="grid two" style="margin-top: 1rem;">
+            <article class="card">
+              <h3>Example test registration</h3>
+              <pre><code>class hdma_mem_initialization_test extends hdma_mem_base_test;
   `uvm_component_utils(hdma_mem_initialization_test)
 
   function new(string name = "hdma_mem_initialization_test",
@@ -682,72 +768,72 @@ regression/hdma_mem_regression.list</code></pre>
                               hdma_mem_init_seq::get_type());
   endfunction
 endclass</code></pre>
-        </article>
-        <article class="card">
-          <h3>Example regression list</h3>
-          <pre><code># regression/hdma_mem_regression.list
+            </article>
+            <article class="card">
+              <h3>Example regression list</h3>
+              <pre><code># regression/hdma_mem_regression.list
 hdma_mem_initialization
 hdma_mem_randomize
 hdma_mem_full_burst_trf</code></pre>
-          <p>
-            Start with one line per test name. If your flow supports parameters, add seed count, timeout, or simulator options in extra columns.
-          </p>
-        </article>
-      </div>
-    </section>
+              <p>
+                Start with one line per test name. If your flow supports parameters, add seed count, timeout, or simulator options in extra columns.
+              </p>
+            </article>
+          </div>
+        </section>
 
-    <section class="section" id="regression">
-      <div class="section-header">
-        <div>
-          <div class="label">Execution</div>
-          <h2>Create and run the regression</h2>
-        </div>
-        <p>Use a repeatable run flow that logs the test name, seed, and result for every execution. That makes triage and reruns straightforward.</p>
-      </div>
+        <section class="section" id="regression">
+          <div class="section-header">
+            <div>
+              <div class="label">Execution</div>
+              <h2>Create and run the regression</h2>
+            </div>
+            <p>Use a repeatable run flow that logs the test name, seed, and result for every execution. That makes triage and reruns straightforward.</p>
+          </div>
 
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Step</th>
-              <th>Action</th>
-              <th>Why it matters</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>1</td>
-              <td>Create a compile target for the HDMA memory UVM testbench.</td>
-              <td>Compile once to eliminate avoidable differences between tests.</td>
-            </tr>
-            <tr>
-              <td>2</td>
-              <td>Create a regression list containing the three tests.</td>
-              <td>This becomes the source of truth for the sanity suite.</td>
-            </tr>
-            <tr>
-              <td>3</td>
-              <td>Assign seed count per test based on risk and runtime budget.</td>
-              <td>Random tests need more seeds than deterministic reset checks.</td>
-            </tr>
-            <tr>
-              <td>4</td>
-              <td>Capture logs, coverage databases, and a summary report.</td>
-              <td>Regression output must be reviewable after the run finishes.</td>
-            </tr>
-            <tr>
-              <td>5</td>
-              <td>Promote the suite only after failures are reproducible and triage-ready.</td>
-              <td>Non-reproducible regressions waste time and hide real design bugs.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Step</th>
+                  <th>Action</th>
+                  <th>Why it matters</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>1</td>
+                  <td>Create a compile target for the HDMA memory UVM testbench.</td>
+                  <td>Compile once to eliminate avoidable differences between tests.</td>
+                </tr>
+                <tr>
+                  <td>2</td>
+                  <td>Create a regression list containing the three tests.</td>
+                  <td>This becomes the source of truth for the sanity suite.</td>
+                </tr>
+                <tr>
+                  <td>3</td>
+                  <td>Assign seed count per test based on risk and runtime budget.</td>
+                  <td>Random tests need more seeds than deterministic reset checks.</td>
+                </tr>
+                <tr>
+                  <td>4</td>
+                  <td>Capture logs, coverage databases, and a summary report.</td>
+                  <td>Regression output must be reviewable after the run finishes.</td>
+                </tr>
+                <tr>
+                  <td>5</td>
+                  <td>Promote the suite only after failures are reproducible and triage-ready.</td>
+                  <td>Non-reproducible regressions waste time and hide real design bugs.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-      <div class="grid two" style="margin-top: 1rem;">
-        <article class="card">
-          <h3>Example commands</h3>
-          <pre><code># compile once
+          <div class="grid two" style="margin-top: 1rem;">
+            <article class="card">
+              <h3>Example commands</h3>
+              <pre><code># compile once
 make compile
 
 # run one test
@@ -759,48 +845,331 @@ make test TEST=hdma_mem_randomize SEED=102
 
 # run the sanity regression
 make regress TESTLIST=regression/hdma_mem_regression.list</code></pre>
-        </article>
-        <article class="card">
-          <h3>Recommended pass/fail rules</h3>
-          <ul>
-            <li>Fail on any UVM error, fatal, scoreboard mismatch, or protocol assertion failure.</li>
-            <li>Fail if a test times out before all planned sequences complete.</li>
-            <li>Pass only if required coverage points are sampled for the intended scenario.</li>
-            <li>Store the seed in the report so every failure can be replayed exactly.</li>
-          </ul>
-        </article>
-      </div>
-    </section>
+            </article>
+            <article class="card">
+              <h3>Recommended pass/fail rules</h3>
+              <ul>
+                <li>Fail on any UVM error, fatal, scoreboard mismatch, or protocol assertion failure.</li>
+                <li>Fail if a test times out before all planned sequences complete.</li>
+                <li>Pass only if required coverage points are sampled for the intended scenario.</li>
+                <li>Store the seed in the report so every failure can be replayed exactly.</li>
+              </ul>
+            </article>
+          </div>
+        </section>
 
-    <section class="callout" id="checklist">
-      <div class="label">Release Checklist</div>
-      <h2>Before calling the regression ready</h2>
-      <div class="grid two" style="margin-top: 1rem;">
-        <article class="card" style="background: rgba(255,255,255,0.64);">
-          <h3>Technical checks</h3>
-          <ul>
-            <li>The HDMA agent supports reset, read, write, and burst transactions.</li>
-            <li>The scoreboard predicts memory contents for all legal accesses.</li>
-            <li>The monitor samples enough detail to debug address, data, and burst issues.</li>
-            <li>The coverage model includes initialization, random accesses, and full burst scenarios.</li>
-          </ul>
-        </article>
-        <article class="card" style="background: rgba(255,255,255,0.64);">
-          <h3>Regression checks</h3>
-          <ul>
-            <li><span class="mono">hdma_mem_initialization</span> is fast and stable enough for smoke use.</li>
-            <li><span class="mono">hdma_mem_randomize</span> has legal constraints and replayable seeds.</li>
-            <li><span class="mono">hdma_mem_full_burst_trf</span> exercises maximum burst length and boundary behavior.</li>
-            <li>The regression summary clearly shows pass/fail status per test and per seed.</li>
-          </ul>
-        </article>
+        <section class="callout" id="checklist">
+          <div class="label">Release Checklist</div>
+          <h2>Before calling the regression ready</h2>
+          <div class="grid two" style="margin-top: 1rem;">
+            <article class="card" style="background: rgba(255,255,255,0.64);">
+              <h3>Technical checks</h3>
+              <ul>
+                <li>The HDMA agent supports reset, read, write, and burst transactions.</li>
+                <li>The scoreboard predicts memory contents for all legal accesses.</li>
+                <li>The monitor samples enough detail to debug address, data, and burst issues.</li>
+                <li>The coverage model includes initialization, random accesses, and full burst scenarios.</li>
+              </ul>
+            </article>
+            <article class="card" style="background: rgba(255,255,255,0.64);">
+              <h3>Regression checks</h3>
+              <ul>
+                <li><span class="mono">hdma_mem_initialization</span> is fast and stable enough for smoke use.</li>
+                <li><span class="mono">hdma_mem_randomize</span> has legal constraints and replayable seeds.</li>
+                <li><span class="mono">hdma_mem_full_burst_trf</span> exercises maximum burst length and boundary behavior.</li>
+                <li>The regression summary clearly shows pass/fail status per test and per seed.</li>
+              </ul>
+            </article>
+          </div>
+
+          <div class="foot">
+            <span>Suggested page title: <span class="mono">HDMA UVM Guide and AXI Primer</span></span>
+            <span>Repository placement: <span class="mono">/index.html</span> on the <span class="mono">main</span> branch</span>
+          </div>
+        </section>
       </div>
 
-      <div class="foot">
-        <span>Suggested page title: <span class="mono">HDMA Memory UVM Regression Guide</span></span>
-        <span>Repository placement: <span class="mono">/index.html</span> on the <span class="mono">main</span> branch</span>
+      <div class="page" id="axi-page" hidden>
+        <header class="hero">
+          <section class="hero-panel cool">
+            <span class="eyebrow cool">ARM AMBA Summary</span>
+            <h1>AXI Protocol Primer for the HDMA Environment</h1>
+            <p class="hero-copy">
+              This tab is a practical summary of the AXI protocol based on ARM AMBA reference material.
+              It focuses on the memory-mapped AXI behavior most relevant to an HDMA verification environment:
+              channel separation, <span class="mono">VALID/READY</span> handshakes, burst behavior, responses, and UVM check points.
+            </p>
+            <div class="hero-grid">
+              <div class="chip">
+                <strong>5 channels</strong>
+                AXI uses independent write address, write data, write response, read address, and read data channels.
+              </div>
+              <div class="chip">
+                <strong>Handshake driven</strong>
+                Transfers happen only when <span class="mono">VALID</span> and <span class="mono">READY</span> are asserted together.
+              </div>
+              <div class="chip">
+                <strong>Burst aware</strong>
+                AXI supports fixed, incrementing, and wrapping bursts with explicit last-beat signaling.
+              </div>
+            </div>
+          </section>
+
+          <aside class="stats-panel">
+            <div class="stat cool">
+              <strong>Read and write paths are decoupled</strong>
+              <p>Address, data, and response timing are intentionally independent so the fabric can pipeline and overlap traffic.</p>
+            </div>
+            <div class="stat cool">
+              <strong>Outstanding transactions are normal</strong>
+              <p>AXI allows multiple in-flight requests, so scoreboards and monitors must track ordering and IDs carefully.</p>
+            </div>
+            <div class="stat cool">
+              <strong>Protocol correctness is local</strong>
+              <p>Every channel follows the same core handshake rule, which makes assertions and monitors very systematic.</p>
+            </div>
+          </aside>
+        </header>
+
+        <section class="section" id="axi-overview">
+          <div class="section-header">
+            <div>
+              <div class="label cool">Overview</div>
+              <h2>What AXI is and why it matters</h2>
+            </div>
+            <p>ARM defines AXI as part of the AMBA family for high-performance on-chip communication. For an HDMA memory design, AXI usually carries the register traffic, memory burst traffic, or both.</p>
+          </div>
+          <div class="grid two">
+            <article class="card">
+              <h3>Core ideas</h3>
+              <ul>
+                <li>AXI separates address/control information from payload data.</li>
+                <li>Write and read transactions use different channels and can progress independently.</li>
+                <li>Transactions can be pipelined, which improves throughput compared with single-request buses.</li>
+                <li>Responses carry success or error status back to the master.</li>
+              </ul>
+            </article>
+            <article class="card quote-card">
+              <h3>Practical interpretation</h3>
+              <p>
+                For UVM, this means one monitor cannot assume a simple request-response timeline. Your environment has to observe each channel,
+                reconstruct transactions across time, and prove that the DUT keeps the protocol legal while preserving data integrity.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section class="section" id="axi-channels">
+          <div class="section-header">
+            <div>
+              <div class="label cool">Channels</div>
+              <h2>The five independent AXI channels</h2>
+            </div>
+            <p>ARM AXI uses five channels. The write path uses three of them, and the read path uses two. Each channel has its own handshake.</p>
+          </div>
+          <div class="grid five">
+            <article class="card channel-card" data-short="AW">
+              <h3>Write Address</h3>
+              <p>Carries write address and control fields such as burst length, burst size, burst type, and transaction ID.</p>
+            </article>
+            <article class="card channel-card" data-short="W">
+              <h3>Write Data</h3>
+              <p>Carries the data beats for a write burst along with byte strobes and the final-beat marker <span class="mono">WLAST</span>.</p>
+            </article>
+            <article class="card channel-card" data-short="B">
+              <h3>Write Response</h3>
+              <p>Returns completion status such as <span class="mono">OKAY</span> or error responses after the write burst has been accepted.</p>
+            </article>
+            <article class="card channel-card" data-short="AR">
+              <h3>Read Address</h3>
+              <p>Carries read address and control fields describing the requested burst.</p>
+            </article>
+            <article class="card channel-card" data-short="R">
+              <h3>Read Data</h3>
+              <p>Returns data beats plus response information and the last-beat marker <span class="mono">RLAST</span>.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="section" id="axi-handshake">
+          <div class="section-header">
+            <div>
+              <div class="label cool">Handshake</div>
+              <h2>How VALID and READY work</h2>
+            </div>
+            <p>ARM’s single-interface rules define a simple but strict rule: data or control transfers only on a cycle where both sides assert the handshake.</p>
+          </div>
+          <div class="grid two">
+            <article class="card">
+              <h3>Rules to remember</h3>
+              <ul>
+                <li>The source raises <span class="mono">VALID</span> when it has information to transfer.</li>
+                <li>The destination raises <span class="mono">READY</span> when it can accept a transfer.</li>
+                <li>A transfer happens only when <span class="mono">VALID</span> and <span class="mono">READY</span> are both high on the active clock edge.</li>
+                <li>Once <span class="mono">VALID</span> is asserted, the source must keep control/data stable until the handshake completes.</li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3>Verification consequences</h3>
+              <pre><code>if (AWVALID &amp;&amp; AWREADY) begin
+  accept_write_address();
+end
+
+if (WVALID &amp;&amp; WREADY) begin
+  accept_write_data_beat();
+end
+
+if (RVALID &amp;&amp; RREADY) begin
+  sample_read_data_beat();
+end</code></pre>
+              <p>Assertions should check handshake legality and data stability under backpressure.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="section" id="axi-bursts">
+          <div class="section-header">
+            <div>
+              <div class="label cool">Bursts</div>
+              <h2>Burst types, length, and boundary rules</h2>
+            </div>
+            <p>AXI is burst oriented. One address phase can describe multiple data beats, which is especially important for an HDMA memory path.</p>
+          </div>
+          <div class="grid two">
+            <article class="card">
+              <h3>Key burst fields</h3>
+              <ul>
+                <li><span class="mono">AxLEN</span> encodes the number of transfers in the burst minus one.</li>
+                <li><span class="mono">AxSIZE</span> encodes the number of bytes in each beat.</li>
+                <li><span class="mono">AxBURST</span> selects the burst type: <span class="mono">FIXED</span>, <span class="mono">INCR</span>, or <span class="mono">WRAP</span>.</li>
+                <li><span class="mono">WLAST</span> and <span class="mono">RLAST</span> mark the final beat of a burst.</li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3>Important protocol checks</h3>
+              <ul>
+                <li>Beat count must match the programmed burst length.</li>
+                <li>Address progression must match the selected burst type.</li>
+                <li>Wrapping bursts use restricted legal lengths.</li>
+                <li>A burst must not cross the protocol boundary limit defined by the AXI spec.</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="section" id="axi-uvm">
+          <div class="section-header">
+            <div>
+              <div class="label cool">UVM Mapping</div>
+              <h2>What your HDMA AXI verification should check</h2>
+            </div>
+            <p>The protocol summary is only useful if it turns into checkers, coverage, and tests. These are the highest-value items to map into the UVM environment.</p>
+          </div>
+          <div class="grid two">
+            <article class="card">
+              <h3>Assertions and scoreboard rules</h3>
+              <ul>
+                <li>Control signals remain stable while <span class="mono">VALID=1</span> and the handshake has not completed.</li>
+                <li><span class="mono">WLAST</span> and <span class="mono">RLAST</span> appear exactly on the final beat.</li>
+                <li>Response codes are legal and aligned with the transaction outcome.</li>
+                <li>Read data and write completion match the reference model for address, size, and burst type.</li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3>Coverage targets</h3>
+              <ul>
+                <li>All burst types used by the design configuration.</li>
+                <li>Short bursts, long bursts, and full burst traffic.</li>
+                <li>Backpressure on every active channel.</li>
+                <li>Error responses, boundary cases, and reset during or around traffic.</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="callout" id="axi-sources">
+          <div class="label cool">Primary Sources</div>
+          <h2>ARM references used for this summary</h2>
+          <p style="margin-top: 0.5rem;">
+            This page is a condensed engineering guide, not a replacement for the official AMBA specification. Use the ARM documents below as the final authority.
+          </p>
+          <div class="sources" style="margin-top: 1rem;">
+            <a class="source-link" href="https://developer.arm.com/documentation/ihi0022/latest/" target="_blank" rel="noreferrer">
+              <article class="card">
+                <h3>AMBA AXI and ACE Protocol Specification</h3>
+                <p>ARM IHI 0022. The formal definition of single-interface requirements, channels, ordering, bursts, responses, and protocol rules.</p>
+              </article>
+            </a>
+            <a class="source-link" href="https://developer.arm.com/documentation/102202/0200" target="_blank" rel="noreferrer">
+              <article class="card">
+                <h3>Introduction to AMBA AXI4</h3>
+                <p>ARM overview material that summarizes the purpose of AXI, independent channels, transactions, and burst-based operation.</p>
+              </article>
+            </a>
+            <a class="source-link" href="https://developer.arm.com/documentation/ihi0051/latest/" target="_blank" rel="noreferrer">
+              <article class="card">
+                <h3>AMBA AXI-Stream Protocol Specification</h3>
+                <p>Included as a contrast source when your HDMA block also uses stream-style data movement, where transfer semantics differ from memory-mapped AXI.</p>
+              </article>
+            </a>
+          </div>
+        </section>
       </div>
-    </section>
+    </main>
   </div>
+
+  <script>
+    const tabButtons = document.querySelectorAll("[data-tab-target]");
+    const pages = document.querySelectorAll(".page");
+    const navs = document.querySelectorAll("[data-nav]");
+
+    function pageForHash(hash) {
+      if (!hash) {
+        return "regression-page";
+      }
+
+      const target = document.getElementById(hash.replace("#", ""));
+      if (!target) {
+        return "regression-page";
+      }
+
+      const page = target.closest(".page");
+      return page ? page.id : "regression-page";
+    }
+
+    function activatePage(pageId) {
+      pages.forEach((page) => {
+        const active = page.id === pageId;
+        page.hidden = !active;
+      });
+
+      navs.forEach((nav) => {
+        nav.hidden = nav.dataset.nav !== pageId;
+      });
+
+      tabButtons.forEach((button) => {
+        const active = button.dataset.tabTarget === pageId;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-selected", String(active));
+      });
+    }
+
+    tabButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const anchor = button.dataset.tabAnchor;
+        if (anchor) {
+          window.location.hash = anchor;
+        } else {
+          activatePage(button.dataset.tabTarget);
+        }
+      });
+    });
+
+    window.addEventListener("hashchange", () => {
+      activatePage(pageForHash(window.location.hash));
+    });
+
+    activatePage(pageForHash(window.location.hash));
+  </script>
 </body>
 </html>
